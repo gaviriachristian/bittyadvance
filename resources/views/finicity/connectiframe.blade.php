@@ -145,13 +145,14 @@
                 }
 
                 if(event.data.action == "Initialize") {
+                    var accountId = "5016727701";
                     $.ajax({
                         type: 'GET',
-                        url: '/finicity/getaccountowner/customer/{{$customerId}}/account/{{accountId}}',
+                        url: '/finicity/getaccountowner/customer/{{$customerId}}/account/'+accountId,
                         data: {
                             "_token": "{{ csrf_token() }}",
                             "customerId": {{$customerId}},
-                            "accountId": "5016727701"
+                            "accountId": accountId
                         },
                         success: function(data) {
                             console.log('getAccountOwner: ', data);
@@ -185,7 +186,7 @@
                         }
                     });
                 }
-                */
+                
 
                 // var from = new Date("2021-05-01 0:00");
                 // var to = new Date("2021-06-27 0:00");
@@ -203,6 +204,7 @@
                         }
                     });
                 }
+                */
             }                                
         });
     });
