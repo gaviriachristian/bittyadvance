@@ -21,13 +21,15 @@ class CustomersController extends Controller
             foreach ($customers as $customer) {
                 DB::connection()->getPdo();
                 if(!DB::table('customers')->where('id', intval($customer['id']))->exists()) {
+                    $createdDate = date('Y-m-d H:i:s', !empty($customer['createdDate']) ? $customer['createdDate'] : null);
                     DB::table('customers')->insert([
                         'id' => intval($customer['id']),
                         'username' => !empty($customer['username']) ? $customer['username'] : '',
                         'firstName' => !empty($customer['firstName']) ? $customer['firstName'] : '',
                         'lastName' => !empty($customer['lastName']) ? $customer['lastName'] : '',
-                        'type' => !empty($account['type']) ? $account['type'] : '',
-                        'createdDate' => !empty($account['createdDate']) ? $account['createdDate'] : null,
+                        'type' => !empty($customer['type']) ? $customer['type'] : '',
+                        'createdDate' => $createdDate,
+                        'created_at' => $date
                     ]); 
                 }
             }

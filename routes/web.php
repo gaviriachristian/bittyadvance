@@ -35,7 +35,7 @@ Route::get('/finicity/addtestingcustomer/username/{username}/firstname/{firstnam
 Route::get('/finicity/createconsumer/customer/{customer}', 'FinicityController@createConsumer');
 
 Route::get('/finicity/getcustomers/start/{start}/limit/{limit}/type/{type}', 'FinicityController@getCustomers');
-Route::get('/finicity/getcustomersaccounts/customer/{customer}', 'FinicityController@getCustomersAccounts');
+Route::get('/finicity/getcustomersaccounts/customer/{customer}/status/{status}', 'FinicityController@getCustomersAccounts');
 Route::get('/finicity/getaccountowner/customer/{customer}/account/{account}', 'FinicityController@getAccountOwner');
 
 Route::get('/finicity/generatecashflowreport/customer/{customer}/account/{account}', 'FinicityController@generateCashFlowReport');
@@ -43,6 +43,7 @@ Route::get('/finicity/getreportbycustomer/customer/{customer}/report/{report}', 
 
 Route::get('/finicity/getcustomertransactionsall/customer/{customer}', 'FinicityController@getCustomerTransactionsAll');
 Route::get('/finicity/getcustomeraccounttransactions/customer/{customer}/account/{account}', 'FinicityController@getCustomerAccountTransactions');
+Route::get('/finicity/getcustomeraccounttransactionsreport/customer/{customer}/account/{account}/from/{from}/to/{to}', 'FinicityController@getCustomerAccountTransactionsReport');
 
 Route::get('/finicity/getaccountachdetails/customer/{customer}/account/{account}', 'FinicityController@getAccountACHDetails');
 

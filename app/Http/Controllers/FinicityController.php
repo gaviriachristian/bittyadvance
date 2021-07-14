@@ -90,10 +90,10 @@ class FinicityController extends Controller
         return view('finicity.connectiframe', compact('url', 'token', 'customerId'));
     }
 
-    public function getCustomersAccounts($customerId)
+    public function getCustomersAccounts($customerId, $status='active')
     {
         $client = new Client();
-        $url = env('API_BASE_URL')."/aggregation/v1/customers/{$customerId}/accounts";
+        $url = env('API_BASE_URL')."/aggregation/v1/customers/{$customerId}/accounts?status={$status}";
         $token = !empty(session('finicityAppToken')) ? session('finicityAppToken') : $this->getToken();
 
         $headers = [
@@ -182,7 +182,10 @@ class FinicityController extends Controller
     {
         try {
             $client = new Client();
-            $url = "https://api.finicity.com/aggregation/v3/customers/{$customerId}/transactions?fromDate=1619827200&toDate=1624752000&start=1&limit=1000&sort=desc&includePending=false";
+            // 2016-07-12 / 2021-07-12
+            //$url = "https://api.finicity.com/aggregation/v3/customers/{$customerId}/transactions?fromDate=1468353073&toDate=1626119473&start=1&limit=1000&sort=desc&includePending=true";
+            // 2019-10-12 / 2021-04-14
+            $url = "https://api.finicity.com/aggregation/v3/customers/{$customerId}/transactions?fromDate=1570896373&toDate=1618391120&limit=1000&sort=asc";
             $token = !empty(session('finicityAppToken')) ? session('finicityAppToken') : $this->getToken();
 
             $headers = [
@@ -215,7 +218,7 @@ class FinicityController extends Controller
     {
         try {
             $client = new Client();
-            $url = "https://api.finicity.com/aggregation/v3/customers/{$customerId}/accounts/{$accountId}/transactions?fromDate=1619827200&toDate=1624752000&start=1&limit=1000&sort=desc&includePending=false";
+            $url = "https://api.finicity.com/aggregation/v3/customers/{$customerId}/accounts/{$accountId}/transactions?fromDate=1619841600&toDate=1626062400&start=1&limit=1000&sort=desc&includePending=false";
             $token = !empty(session('finicityAppToken')) ? session('finicityAppToken') : $this->getToken();
 
             $headers = [
@@ -243,11 +246,70 @@ class FinicityController extends Controller
         }
     }    
 
+    public function getCustomerAccountTransactionsReport($customerId, $accountId, $from, $to)
+    {
+        try {
+            $client = new Client();
+            $url = "https://api.finicity.com/aggregation/v3/customers/{$customerId}/accounts/{$accountId}/transactions?fromDate={$from}&toDate={$to}&start=1&limit=1000&sort=desc&includePending=false";
+            $token = !empty(session('finicityAppToken')) ? session('finicityAppToken') : $this->getToken();
+
+            $headers = [
+                'Content-Type' => env('APLICATION_JSON'),
+                'Accept' => env('APLICATION_JSON'),
+                'Finicity-App-Key' => env('FINICITY_APP_KEY'),
+                'Finicity-App-Token' => $token,
+            ];
+
+            $response = $client->request('GET', $url, [
+                'headers' => $headers,
+                'verify'  => false
+            ]);
+
+            $responseBody = json_decode($response->getBody(), true);
+            $transactions = $responseBody["transactions"];
+            $report = [];
+            foreach ($transactions as $transaction) {
+                //if($transaction['status']=='active') {
+                    //if($transaction['categorization']['category']=="Income") {
+                        $year = date("Y", $transaction['postedDate']);
+                        $month = date("m", $transaction['postedDate']);
+                        if(!isset($report[$year])) {
+                            $report[$year] = [];
+                        }
+                        if(!isset($report[$year][$month])) {
+                            $report[$year][$month] = [];
+                        }
+                        if(isset($report[$year][$month]['minDailyBalance'])) {
+                            if($transaction['amount'] < $report[$year][$month]['minDailyBalance']) {
+                                $report[$year][$month]['minDailyBalance'] = $transaction['amount'];
+                            }
+                        } else {
+                            $report[$year][$month]['minDailyBalance'] = $transaction['amount'];
+                        }
+                        if(isset($report[$year][$month]['maxDailyBalance'])) {
+                            if($transaction['amount'] > $report[$year][$month]['minDailyBalance']) {
+                                $report[$year][$month]['maxDailyBalance'] = $transaction['amount'];
+                            }
+                        } else {
+                            $report[$year][$month]['maxDailyBalance'] = $transaction['amount'];
+                        }
+                        $report[$year][$month]['count'] = isset($report[$year][$month]['count']) ? $report[$year][$month]['count']+1 : 1;
+                        $report[$year][$month]['total'] = isset($report[$year][$month]['total']) ? $report[$year][$month]['total']+$transaction['amount'] : $transaction['amount'];
+                        $report[$year][$month]['averege'] = $report[$year][$month]['total'] / $report[$year][$month]['count']; 
+                    //}
+                //}
+            }
+            return $report;
+        } catch (Exception $e) {
+            echo 'Catch exception: ',  $e->getMessage();
+        }
+    }    
+
 
     public function generateCashFlowReport($customerId, $accountId)
     {
         $client = new Client();
-        $url = "https://api.finicity.com/decisioning/v2/customers/{$customerId}/cashFlowBusiness";
+        $url = "https://api.finicity.com/decisioning/v2/customers/{$customerId}/cashFlowBusiness?fromDate=1593576000";
         $token = !empty(session('finicityAppToken')) ? session('finicityAppToken') : $this->getToken();
 
         $params = [
