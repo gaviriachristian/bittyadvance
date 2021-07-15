@@ -328,7 +328,7 @@ class FinicityController extends Controller
             $responseBody = json_decode($response->getBody(), true);
             $transactions = $responseBody["transactions"];
             $report = [];
-            $otherCategories = ['Credit Card Payment'];
+            $reportUnixDate = [];
             foreach ($transactions as $transaction) {
                 //if($transaction['status']=='active') {
                     //if($transaction['categorization']['category']=="Income") {
@@ -343,12 +343,49 @@ class FinicityController extends Controller
                             if(!isset($report[$year][$month])) {
                                 $report[$year][$month] = [];
                             }
-
-                            $report[$year][$month]['total'] = isset($report[$year][$month]['total']) ? round($report[$year][$month]['total']+$transaction['amount'], 2) : round($transaction['amount'], 2);
-                            if (!in_array($transaction['categorization']['category'], $otherCategories)) {
-                                $report[$year][$month]['underwriting_total'] = isset($report[$year][$month]['underwriting_total']) ? round($report[$year][$month]['underwriting_total']+$transaction['amount'], 2) : round($transaction['amount'], 2);
+                            if(!isset($reportUnixDate[$unixDate])) {
+                                $reportUnixDate[$unixDate] = [];
                             }
-                            $report[$year][$month]['positive_transaction_count'] = isset($report[$year][$month]['positive_transaction_count']) ? $report[$year][$month]['positive_transaction_count']+1 : 1;
+                            
+                            if(isset($report[$year][$month]['minMonthlyAmount'])) {
+                                if($transaction['amount'] < $report[$year][$month]['minMonthlyAmount']) {
+                                    $report[$year][$month]['minMonthlyAmount'] = $transaction['amount'];
+                                }
+                            } else {
+                                $report[$year][$month]['minMonthlyAmount'] = $transaction['amount'];
+                            }
+                            if(isset($report[$year][$month]['maxMonthlyAmount'])) {
+                                if($transaction['amount'] > $report[$year][$month]['maxMonthlyAmount']) {
+                                    $report[$year][$month]['maxMonthlyAmount'] = $transaction['amount'];
+                                }
+                            } else {
+                                $report[$year][$month]['maxMonthlyAmount'] = $transaction['amount'];
+                            }
+
+                            if(isset($reportUnixDate[$unixDate]['minMonthlyAmount'])) {
+                                if($transaction['amount'] < $reportUnixDate[$unixDate]['minMonthlyAmount']) {
+                                    $reportUnixDate[$unixDate]['minMonthlyAmount'] = $transaction['amount'];
+                                }
+                            } else {
+                                $reportUnixDate[$unixDate]['minMonthlyAmount'] = $transaction['amount'];
+                            }
+                            if(isset($reportUnixDate[$unixDate]['maxMonthlyAmount'])) {
+                                if($transaction['amount'] > $reportUnixDate[$unixDate]['maxMonthlyAmount']) {
+                                    $reportUnixDate[$unixDate]['maxMonthlyAmount'] = $transaction['amount'];
+                                }
+                            } else {
+                                $reportUnixDate[$unixDate]['maxMonthlyAmount'] = $transaction['amount'];
+                            }
+
+                            $total = isset($report[$year][$month]['total']) ? $report[$year][$month]['total']+$transaction['amount'] : $transaction['amount'];
+                            $report[$year][$month]['count'] = isset($report[$year][$month]['count']) ? $report[$year][$month]['count']+1 : 1;
+                            $report[$year][$month]['average'] = round($total / $report[$year][$month]['count'], 2); 
+                            $report[$year][$month]['total'] = round($total, 2);
+
+                            $total = isset($reportUnixDate[$unixDate]['total']) ? $reportUnixDate[$unixDate]['total']+$transaction['amount'] : $transaction['amount'];
+                            $reportUnixDate[$unixDate]['count'] = isset($reportUnixDate[$unixDate]['count']) ? $reportUnixDate[$unixDate]['count']+1 : 1;
+                            $reportUnixDate[$unixDate]['average'] = round($total / $reportUnixDate[$unixDate]['count'], 2); 
+                            $reportUnixDate[$unixDate]['total'] = round($total, 2);
                         }
                     //}
                 //}

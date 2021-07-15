@@ -44,6 +44,7 @@ Route::get('/finicity/getreportbycustomer/customer/{customer}/report/{report}', 
 Route::get('/finicity/getcustomertransactionsall/customer/{customer}', 'FinicityController@getCustomerTransactionsAll');
 Route::get('/finicity/getcustomeraccounttransactions/customer/{customer}/account/{account}', 'FinicityController@getCustomerAccountTransactions');
 Route::get('/finicity/getcustomeraccounttransactionsreport/customer/{customer}/account/{account}/from/{from}/to/{to}', 'FinicityController@getCustomerAccountTransactionsReport');
+Route::get('/finicity/getmonthlydepositsreport/customer/{customer}/account/{account}/from/{from}/to/{to}', 'FinicityController@getMonthlyDepositsReport');
 
 Route::get('/finicity/getaccountachdetails/customer/{customer}/account/{account}', 'FinicityController@getAccountACHDetails');
 
