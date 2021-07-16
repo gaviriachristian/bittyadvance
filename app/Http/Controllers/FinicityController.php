@@ -119,6 +119,29 @@ class FinicityController extends Controller
         }
     }
 
+    public function getCustomersAccount($customerId, $accountId)
+    {
+        $client = new Client();
+        $url = env('API_BASE_URL')."/aggregation/v1/customers/{$customerId}/accounts/{$accountId}";
+        $token = !empty(session('finicityAppToken')) ? session('finicityAppToken') : $this->getToken();
+
+        $headers = [
+            'Content-Type' => env('APLICATION_JSON'),
+            'Accept' => env('APLICATION_JSON'),
+            'Finicity-App-Key' => env('FINICITY_APP_KEY'),
+            'Finicity-App-Token' => $token,
+        ];
+
+        $response = $client->request('GET', $url, [
+            'headers' => $headers,
+            'verify'  => false,
+        ]);
+
+        $responseBody = json_decode($response->getBody(), true);
+        
+        return $responseBody;
+    }
+
     public function getAccountOwner($customerId, $accountId)
     {
         $client = new Client();
@@ -306,7 +329,7 @@ class FinicityController extends Controller
         }
     }    
 
-    public function getMonthlyDepositsReport($customerId, $accountId, $from, $to, $type='date')
+    public function getMonthlyDepositsReport($customerId, $accountId, $from, $to)
     {
         try {
             $client = new Client();
@@ -328,15 +351,16 @@ class FinicityController extends Controller
             $responseBody = json_decode($response->getBody(), true);
             $transactions = $responseBody["transactions"];
             $report = [];
+            $responseReport = [];
             $otherCategories = ['Credit Card Payment'];
+            $counter = 0;
             foreach ($transactions as $transaction) {
                 //if($transaction['status']=='active') {
                     //if($transaction['categorization']['category']=="Income") {
                         if($transaction['amount']>=0) {
                             $year = date("Y", $transaction['postedDate']);
                             $month = date("m", $transaction['postedDate']);
-                            $unixDate = strtotime("{$year}-{$month}-01 00:00:00");
-                            
+                           
                             if(!isset($report[$year])) {
                                 $report[$year] = [];
                             }
@@ -354,31 +378,59 @@ class FinicityController extends Controller
                 //}
             }
 
-            if($type=='unixdate') {
-                return $reportUnixDate;
-            } else {
-                return $report;
+            $counter = 0;
+            foreach ($report as $indexYear => $valueYear) {
+                foreach ($valueYear as $indexMonth => $valueMonth) {
+                    $responseReport[$counter]['year_month'] = $indexYear.'-'.$indexMonth.'-01';
+                    $responseReport[$counter]['amount'] = $valueMonth['total'];
+                    $responseReport[$counter]['underwriting_total'] = $valueMonth['underwriting_total'];
+                    $responseReport[$counter]['positive_transaction_count'] = $valueMonth['positive_transaction_count'];
+                    $responseReport[$counter]['customer_id'] = $customerId;
+                    $responseReport[$counter]['account_id'] = $accountId;
+                    $counter++;
+                }
             }
+                        
+            $monthlyDepositsReport = new MonthlyDepositsReportController();
+            $monthlyDepositsReport->deleteMonthlyDepositsReport($customerId, $accountId);
+            $monthlyDepositsReport->saveMonthlyDepositsReport($responseReport);
+            
+            return $report;
 
         } catch (Exception $e) {
             echo 'Catch exception: ',  $e->getMessage();
         }
     }    
 
-    public function getDailyBalanceReport($customerId, $accountId, $from, $to)
+    public function getDailyBalanceReport($customerId, $accountId, $from)
     {
         try {
-            $client = new Client();
-            $url = "https://api.finicity.com/aggregation/v3/customers/{$customerId}/accounts/{$accountId}/transactions?fromDate={$from}&toDate={$to}&start=1&limit=1000&sort=desc&includePending=false";
-            $token = !empty(session('finicityAppToken')) ? session('finicityAppToken') : $this->getToken();
 
+            $client = new Client();
+            $url = env('API_BASE_URL')."/aggregation/v1/customers/{$customerId}/accounts/{$accountId}";
+            $token = !empty(session('finicityAppToken')) ? session('finicityAppToken') : $this->getToken();
             $headers = [
                 'Content-Type' => env('APLICATION_JSON'),
                 'Accept' => env('APLICATION_JSON'),
                 'Finicity-App-Key' => env('FINICITY_APP_KEY'),
                 'Finicity-App-Token' => $token,
             ];
-
+            $response = $client->request('GET', $url, [
+                'headers' => $headers,
+                'verify'  => false,
+            ]);
+            $responseBody = json_decode($response->getBody(), true);
+            $currentBalance = $responseBody['balance'];
+            $currentDate = $responseBody['balanceDate'];
+            
+            $client = new Client();
+            $url = "https://api.finicity.com/aggregation/v3/customers/{$customerId}/accounts/{$accountId}/transactions?fromDate={$from}&toDate={$currentDate}&sort=desc";
+            $headers = [
+                'Content-Type' => env('APLICATION_JSON'),
+                'Accept' => env('APLICATION_JSON'),
+                'Finicity-App-Key' => env('FINICITY_APP_KEY'),
+                'Finicity-App-Token' => $token,
+            ];
             $response = $client->request('GET', $url, [
                 'headers' => $headers,
                 'verify'  => false
@@ -387,38 +439,33 @@ class FinicityController extends Controller
             $responseBody = json_decode($response->getBody(), true);
             $transactions = $responseBody["transactions"];
             $report = [];
+            $responseReport = [];
+            $otherCategories = ['Credit Card Payment'];
+            $counter = 0;
+            $lastDay = "";
+            $balance = $currentBalance;
+            $underwriting_balance = $currentBalance;
             foreach ($transactions as $transaction) {
                 //if($transaction['status']=='active') {
                     //if($transaction['categorization']['category']=="Income") {
-                        $year = date("Y", $transaction['postedDate']);
-                        $month = date("m", $transaction['postedDate']);
-                        if(!isset($report[$year])) {
-                            $report[$year] = [];
+                        $day = date("Y", $transaction['postedDate'])."-".date("m", $transaction['postedDate'])."-".date("d", $transaction['postedDate']);
+                        
+                        if($lastDay != $day) {
+                            $report[$day]['balance'] = round($balance, 2);
+                            $report[$day]['underwriting_balance'] = round($underwriting_balance, 2);
                         }
-                        if(!isset($report[$year][$month])) {
-                            $report[$year][$month] = [];
+
+                        $balance = $balance + $transaction['amount'];
+                        if (!in_array($transaction['categorization']['category'], $otherCategories)) {
+                            $underwriting_balance = $underwriting_balance + $transaction['amount'];
                         }
-                        if(isset($report[$year][$month]['minDailyBalance'])) {
-                            if($transaction['amount'] < $report[$year][$month]['minDailyBalance']) {
-                                $report[$year][$month]['minDailyBalance'] = $transaction['amount'];
-                            }
-                        } else {
-                            $report[$year][$month]['minDailyBalance'] = $transaction['amount'];
-                        }
-                        if(isset($report[$year][$month]['maxDailyBalance'])) {
-                            if($transaction['amount'] > $report[$year][$month]['maxDailyBalance']) {
-                                $report[$year][$month]['maxDailyBalance'] = $transaction['amount'];
-                            }
-                        } else {
-                            $report[$year][$month]['maxDailyBalance'] = $transaction['amount'];
-                        }
-                        $report[$year][$month]['count'] = isset($report[$year][$month]['count']) ? $report[$year][$month]['count']+1 : 1;
-                        $report[$year][$month]['total'] = isset($report[$year][$month]['total']) ? $report[$year][$month]['total']+$transaction['amount'] : $transaction['amount'];
-                        $report[$year][$month]['averege'] = $report[$year][$month]['total'] / $report[$year][$month]['count']; 
+                        $lastDay = $day;
                     //}
                 //}
             }
+
             return $report;
+
         } catch (Exception $e) {
             echo 'Catch exception: ',  $e->getMessage();
         }
