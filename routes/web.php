@@ -42,8 +42,8 @@ Route::get('/finicity/getaccountowner/customer/{customer}/account/{account}', 'F
 Route::get('/finicity/generatecashflowreport/customer/{customer}/account/{account}', 'FinicityController@generateCashFlowReport');
 Route::get('/finicity/getreportbycustomer/customer/{customer}/report/{report}', 'FinicityController@getReportByCustomer');
 
-Route::get('/finicity/getcustomertransactionsall/customer/{customer}', 'FinicityController@getCustomerTransactionsAll');
-Route::get('/finicity/getcustomeraccounttransactions/customer/{customer}/account/{account}', 'FinicityController@getCustomerAccountTransactions');
+Route::get('/finicity/getcustomertransactionsall/customer/{customer}/from/{from}/to/{to}', 'FinicityController@getCustomerTransactionsAll');
+Route::get('/finicity/getcustomeraccounttransactions/customer/{customer}/account/{account}/from/{from}/to/{to}', 'FinicityController@getCustomerAccountTransactions');
 Route::get('/finicity/getcustomeraccounttransactionsreport/customer/{customer}/account/{account}/from/{from}/to/{to}', 'FinicityController@getCustomerAccountTransactionsReport');
 Route::get('/finicity/getmonthlydepositsreport/customer/{customer}/account/{account}/from/{from}/to/{to}', 'FinicityController@getMonthlyDepositsReport');
 Route::get('/finicity/getdailybalancereport/customer/{customer}/account/{account}/from/{from}', 'FinicityController@getDailyBalanceReport');

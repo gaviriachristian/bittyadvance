@@ -201,14 +201,15 @@ class FinicityController extends Controller
         }
     }
 
-    public function getCustomerTransactionsAll($customerId)
+    public function getCustomerTransactionsAll($customerId, $from, $to)
     {
         try {
             $client = new Client();
             // 2016-07-12 / 2021-07-12
             //$url = "https://api.finicity.com/aggregation/v3/customers/{$customerId}/transactions?fromDate=1468353073&toDate=1626119473&start=1&limit=1000&sort=desc&includePending=true";
             // 2019-10-12 / 2021-04-14
-            $url = "https://api.finicity.com/aggregation/v3/customers/{$customerId}/transactions?fromDate=1570896373&toDate=1618391120&limit=1000&sort=asc";
+            //$url = "https://api.finicity.com/aggregation/v3/customers/{$customerId}/transactions?fromDate=1570896373&toDate=1618391120&limit=1000&sort=asc";
+            $url = "https://api.finicity.com/aggregation/v3/customers/{$customerId}/transactions?fromDate={$from}&toDate={$to}&limit=1000&sort=asc";
             $token = !empty(session('finicityAppToken')) ? session('finicityAppToken') : $this->getToken();
 
             $headers = [
@@ -237,11 +238,12 @@ class FinicityController extends Controller
         }
     }
 
-    public function getCustomerAccountTransactions($customerId, $accountId)
+    public function getCustomerAccountTransactions($customerId, $accountId, $from, $to)
     {
         try {
             $client = new Client();
-            $url = "https://api.finicity.com/aggregation/v3/customers/{$customerId}/accounts/{$accountId}/transactions?fromDate=1619841600&toDate=1626062400&start=1&limit=1000&sort=desc&includePending=false";
+            //$url = "https://api.finicity.com/aggregation/v3/customers/{$customerId}/accounts/{$accountId}/transactions?fromDate={$from}&toDate={$to}&start=1&limit=1000&sort=desc&includePending=false";
+            $url = "https://api.finicity.com/aggregation/v3/customers/{$customerId}/accounts/{$accountId}/transactions?fromDate={$from}&toDate={$to}&start=1&limit=1000&sort=desc";
             $token = !empty(session('finicityAppToken')) ? session('finicityAppToken') : $this->getToken();
 
             $headers = [
@@ -355,27 +357,30 @@ class FinicityController extends Controller
             $otherCategories = ['Credit Card Payment'];
             $counter = 0;
             foreach ($transactions as $transaction) {
-                //if($transaction['status']=='active') {
-                    //if($transaction['categorization']['category']=="Income") {
-                        if($transaction['amount']>=0) {
-                            $year = date("Y", $transaction['postedDate']);
-                            $month = date("m", $transaction['postedDate']);
-                           
-                            if(!isset($report[$year])) {
-                                $report[$year] = [];
-                            }
-                            if(!isset($report[$year][$month])) {
-                                $report[$year][$month] = [];
-                            }
+                $type = DB::table('accounts')->where('id', intval($transaction['accountId']))->value('type');
+                if(!empty($type) && $type=="checking") {
+                    //if($transaction['status']=='active') {
+                        //if($transaction['categorization']['category']=="Income") {
+                            if($transaction['amount']>=0) {
+                                $year = date("Y", $transaction['postedDate']);
+                                $month = date("m", $transaction['postedDate']);
+                            
+                                if(!isset($report[$year])) {
+                                    $report[$year] = [];
+                                }
+                                if(!isset($report[$year][$month])) {
+                                    $report[$year][$month] = [];
+                                }
 
-                            $report[$year][$month]['total'] = isset($report[$year][$month]['total']) ? round($report[$year][$month]['total']+$transaction['amount'], 2) : round($transaction['amount'], 2);
-                            if (!in_array($transaction['categorization']['category'], $otherCategories)) {
-                                $report[$year][$month]['underwriting_total'] = isset($report[$year][$month]['underwriting_total']) ? round($report[$year][$month]['underwriting_total']+$transaction['amount'], 2) : round($transaction['amount'], 2);
+                                $report[$year][$month]['total'] = isset($report[$year][$month]['total']) ? round($report[$year][$month]['total']+$transaction['amount'], 2) : round($transaction['amount'], 2);
+                                if (!in_array($transaction['categorization']['category'], $otherCategories)) {
+                                    $report[$year][$month]['underwriting_total'] = isset($report[$year][$month]['underwriting_total']) ? round($report[$year][$month]['underwriting_total']+$transaction['amount'], 2) : round($transaction['amount'], 2);
+                                }
+                                $report[$year][$month]['positive_transaction_count'] = isset($report[$year][$month]['positive_transaction_count']) ? $report[$year][$month]['positive_transaction_count']+1 : 1;
                             }
-                            $report[$year][$month]['positive_transaction_count'] = isset($report[$year][$month]['positive_transaction_count']) ? $report[$year][$month]['positive_transaction_count']+1 : 1;
-                        }
+                        //}
                     //}
-                //}
+                }
             }
 
             $counter = 0;
@@ -440,29 +445,38 @@ class FinicityController extends Controller
             $transactions = $responseBody["transactions"];
             $report = [];
             $responseReport = [];
-            $otherCategories = ['Credit Card Payment'];
             $counter = 0;
             $lastDay = "";
             $balance = $currentBalance;
-            $underwriting_balance = $currentBalance;
             foreach ($transactions as $transaction) {
-                //if($transaction['status']=='active') {
-                    //if($transaction['categorization']['category']=="Income") {
-                        $day = date("Y", $transaction['postedDate'])."-".date("m", $transaction['postedDate'])."-".date("d", $transaction['postedDate']);
-                        
-                        if($lastDay != $day) {
-                            $report[$day]['balance'] = round($balance, 2);
-                            $report[$day]['underwriting_balance'] = round($underwriting_balance, 2);
-                        }
-
-                        $balance = $balance + $transaction['amount'];
-                        if (!in_array($transaction['categorization']['category'], $otherCategories)) {
-                            $underwriting_balance = $underwriting_balance + $transaction['amount'];
-                        }
-                        $lastDay = $day;
+                $type = DB::table('accounts')->where('id', intval($transaction['accountId']))->value('type');
+                if(!empty($type) && $type=="checking") {
+                    //if($transaction['status']=='active') {
+                        //if($transaction['categorization']['category']=="Income") {
+                            $day = date("Y", $transaction['postedDate'])."-".date("m", $transaction['postedDate'])."-".date("d", $transaction['postedDate']);
+                            while ($lastDay != $day) {
+                                $lastDay = date("Y-m-d", strtotime($lastDay."-1 days")); 
+                                $report[$lastDay]['balance'] = round($balance, 2);
+                            }
+                            $balance = $balance + ($transaction['amount']*-1);
+                            $lastDay = $day;
+                        //}
                     //}
-                //}
+                }
             }
+
+            $counter = 0;
+            foreach ($report as $indexDay => $valueDay) {
+                $responseReport[$counter]['day'] = $indexDay;
+                $responseReport[$counter]['balance'] = $valueDay['balance'];
+                $responseReport[$counter]['customer_id'] = $customerId;
+                $responseReport[$counter]['account_id'] = $accountId;
+                $counter++;
+            }
+                        
+            $dailyBalanceReport = new DailyBalanceReportController();
+            $dailyBalanceReport->deleteDailyBalanceReport($customerId, $accountId);
+            $dailyBalanceReport->saveDailyBalanceReport($responseReport);
 
             return $report;
 
