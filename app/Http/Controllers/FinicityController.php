@@ -243,7 +243,7 @@ class FinicityController extends Controller
         try {
             $client = new Client();
             //$url = "https://api.finicity.com/aggregation/v3/customers/{$customerId}/accounts/{$accountId}/transactions?fromDate={$from}&toDate={$to}&start=1&limit=1000&sort=desc&includePending=false";
-            $url = "https://api.finicity.com/aggregation/v3/customers/{$customerId}/accounts/{$accountId}/transactions?fromDate={$from}&toDate={$to}&start=1&limit=1000&sort=desc";
+            $url = "https://api.finicity.com/aggregation/v3/customers/{$customerId}/accounts/{$accountId}/transactions?fromDate={$from}&toDate={$to}&start=1&limit=1000&sort=desc&includePending=true";
             $token = !empty(session('finicityAppToken')) ? session('finicityAppToken') : $this->getToken();
 
             $headers = [
@@ -444,20 +444,62 @@ class FinicityController extends Controller
             $responseBody = json_decode($response->getBody(), true);
             $transactions = $responseBody["transactions"];
             $report = [];
-            $responseReport = [];
+            $responseReportDay = [];
+            $responseReportMonth = [];
             $counter = 0;
             $lastDay = "";
             $balance = $currentBalance;
+            $daysNegative = 0;
+            $monthlyTotal = 0;
+            $loanDebitsTotal = 0;
+            $loanDepositTotal = 0;
             foreach ($transactions as $transaction) {
                 $type = DB::table('accounts')->where('id', intval($transaction['accountId']))->value('type');
                 if(!empty($type) && $type=="checking") {
                     //if($transaction['status']=='active') {
                         //if($transaction['categorization']['category']=="Income") {
+                            
+                            $monthChanged = false;
                             $day = date("Y", $transaction['postedDate'])."-".date("m", $transaction['postedDate'])."-".date("d", $transaction['postedDate']);
                             while ($lastDay != $day) {
                                 $lastDay = date("Y-m-d", strtotime($lastDay."-1 days")); 
-                                $report[$lastDay]['balance'] = round($balance, 2);
+                                $month = date("Y", $transaction['postedDate'])."-".date("m", strtotime($lastDay));
+                                $report['daily'][$lastDay]['balance'] = round($balance, 2);
+                                
+                                if (isset($lastMonth) && $lastMonth != $month) {
+
+                                    $report['monthly'][$lastMonth]['daysNegative'] =  $daysNegative;
+                                    $report['monthly'][$lastMonth]['average'] =  round($monthlyTotal/$counter, 2);
+
+                                    $report['monthly'][$lastMonth]['loanDebitsTotal'] = round($loanDebitsTotal, 2);
+                                    $report['monthly'][$lastMonth]['loanDepositTotal'] = round($loanDepositTotal, 2);
+    
+                                    $counter = 0;
+                                    $daysNegative = 0;
+                                    $monthlyTotal = 0;
+                                    $monthChanged = true;
+                                    $loanDebitsTotal = 0;
+                                    $loanDepositTotal = 0;
+                                }
+                                
+                                if ($balance < 0) {
+                                    $daysNegative++;
+                                }
+                                
+                                $counter++;
+                                $monthlyTotal += $balance;
+                                $lastMonth = $month;
                             }
+
+                            $pos = stripos($transaction['categorization']['category'], "loan");
+                            if ($pos !== false) {
+                                if ($balance < 0) {
+                                    $loanDebitsTotal += abs($transaction['amount']);
+                                } else {
+                                    $loanDepositTotal += abs($transaction['amount']);
+                                }
+                            }
+                        
                             $balance = $balance + ($transaction['amount']*-1);
                             $lastDay = $day;
                         //}
@@ -466,17 +508,36 @@ class FinicityController extends Controller
             }
 
             $counter = 0;
-            foreach ($report as $indexDay => $valueDay) {
-                $responseReport[$counter]['day'] = $indexDay;
-                $responseReport[$counter]['balance'] = $valueDay['balance'];
-                $responseReport[$counter]['customer_id'] = $customerId;
-                $responseReport[$counter]['account_id'] = $accountId;
-                $counter++;
+            if (!empty($report['daily'])) {
+                foreach ($report['daily'] as $indexDay => $valueDay) {
+                    $responseReportDay[$counter]['day'] = $indexDay;
+                    $responseReportDay[$counter]['balance'] = $valueDay['balance'];
+                    $responseReportDay[$counter]['customer_id'] = $customerId;
+                    $responseReportDay[$counter]['account_id'] = $accountId;
+                    $counter++;
+                }
+                $dailyBalanceReport = new DailyBalanceReportController();
+                $dailyBalanceReport->deleteDailyBalanceReport($accountId);
+                $dailyBalanceReport->saveDailyBalanceReport($responseReportDay);
             }
-                        
-            $dailyBalanceReport = new DailyBalanceReportController();
-            $dailyBalanceReport->deleteDailyBalanceReport($customerId, $accountId);
-            $dailyBalanceReport->saveDailyBalanceReport($responseReport);
+
+            if (!empty($report['monthly'])) {
+                $counter = 0;
+                foreach ($report['monthly'] as $indexMonth => $valueMonth) {
+                    $responseReportMonth[$counter]['month'] = $indexMonth."-01";
+                    $responseReportMonth[$counter]['daysNegative'] = $valueMonth['daysNegative'];
+                    $responseReportMonth[$counter]['average'] = $valueMonth['average'];
+                    $responseReportMonth[$counter]['loanDebitsTotal'] = $valueMonth['loanDebitsTotal'];
+                    $responseReportMonth[$counter]['loanDepositTotal'] = $valueMonth['loanDepositTotal'];
+                    $responseReportMonth[$counter]['customer_id'] = $customerId;
+                    $responseReportMonth[$counter]['account_id'] = $accountId;
+                    $counter++;
+                }
+                $monthlyBalanceReport = new MonthlyBalanceReportController();
+                $monthlyBalanceReport->deleteMonthlyBalanceReport($accountId);
+                $monthlyBalanceReport->saveMonyhlyBalanceReport($responseReportMonth);
+            }
+
 
             return $report;
 
