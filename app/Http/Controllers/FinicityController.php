@@ -443,9 +443,8 @@ class FinicityController extends Controller
 
             $responseBody = json_decode($response->getBody(), true);
             $transactions = $responseBody["transactions"];
+            
             $report = [];
-            $responseReportDay = [];
-            $responseReportMonth = [];
             $counter = 0;
             $lastDay = "";
             $balance = $currentBalance;
@@ -459,7 +458,6 @@ class FinicityController extends Controller
                     //if($transaction['status']=='active') {
                         //if($transaction['categorization']['category']=="Income") {
                             
-                            $monthChanged = false;
                             $day = date("Y", $transaction['postedDate'])."-".date("m", $transaction['postedDate'])."-".date("d", $transaction['postedDate']);
                             while ($lastDay != $day) {
                                 $lastDay = date("Y-m-d", strtotime($lastDay."-1 days")); 
@@ -477,7 +475,6 @@ class FinicityController extends Controller
                                     $counter = 0;
                                     $daysNegative = 0;
                                     $monthlyTotal = 0;
-                                    $monthChanged = true;
                                     $loanDebitsTotal = 0;
                                     $loanDepositTotal = 0;
                                 }
@@ -499,7 +496,12 @@ class FinicityController extends Controller
                                     $loanDepositTotal += abs($transaction['amount']);
                                 }
                             }
-                        
+
+                            $report['monthly'][$lastMonth]['daysNegative'] =  $daysNegative;
+                            $report['monthly'][$lastMonth]['average'] =  round($monthlyTotal/$counter, 2);
+                            $report['monthly'][$lastMonth]['loanDebitsTotal'] = round($loanDebitsTotal, 2);
+                            $report['monthly'][$lastMonth]['loanDepositTotal'] = round($loanDepositTotal, 2);
+                    
                             $balance = $balance + ($transaction['amount']*-1);
                             $lastDay = $day;
                         //}
@@ -507,8 +509,9 @@ class FinicityController extends Controller
                 }
             }
 
-            $counter = 0;
             if (!empty($report['daily'])) {
+                $counter = 0;
+                $responseReportMonth = [];
                 foreach ($report['daily'] as $indexDay => $valueDay) {
                     $responseReportDay[$counter]['day'] = $indexDay;
                     $responseReportDay[$counter]['balance'] = $valueDay['balance'];
@@ -523,6 +526,7 @@ class FinicityController extends Controller
 
             if (!empty($report['monthly'])) {
                 $counter = 0;
+                $responseReportDay = [];
                 foreach ($report['monthly'] as $indexMonth => $valueMonth) {
                     $responseReportMonth[$counter]['month'] = $indexMonth."-01";
                     $responseReportMonth[$counter]['daysNegative'] = $valueMonth['daysNegative'];
@@ -537,7 +541,6 @@ class FinicityController extends Controller
                 $monthlyBalanceReport->deleteMonthlyBalanceReport($accountId);
                 $monthlyBalanceReport->saveMonyhlyBalanceReport($responseReportMonth);
             }
-
 
             return $report;
 
