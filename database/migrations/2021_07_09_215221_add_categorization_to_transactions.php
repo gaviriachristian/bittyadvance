@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateInstitutionsTable extends Migration
+class AddCategorizationToTransactions extends Migration
 {
     /**
      * Run the migrations.
@@ -13,11 +13,8 @@ class CreateInstitutionsTable extends Migration
      */
     public function up()
     {
-        Schema::create('institutions', function (Blueprint $table) {
-            $table->bigInteger('id')->unique();
-            $table->string('name');
-            $table->string('urlHomeApp')->nullable();
-            $table->timestamps();
+        Schema::table('transactions', function (Blueprint $table) {
+            $table->text('categorization')->nullable();
         });
     }
 
@@ -28,6 +25,8 @@ class CreateInstitutionsTable extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('institutions');
+        Schema::table('transactions', function($table) {
+            $table->dropColumn('categorization');
+        });
     }
 }
